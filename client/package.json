@@ -1,7 +1,7 @@
 {
-  "name": "asyncio_react_template_client",
+  "name": "crapchat",
   "version": "1.0.0",
-  "description": "Example client for test stack",
+  "description": "A really crap chat program",
   "main": "index.js",
   "scripts": {
     "build": "webpack -p --progress --config webpack.config.js",
