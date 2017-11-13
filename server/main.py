@@ -74,14 +74,11 @@ async def handle_refresh(app, ws, chatid):
             (chatid, )
         )
         messages = [
-            {'user': row[0], 'time': str(row[1]), 'text': row[2]}
+            {'user': row[0], 'time': row[1].isoformat(), 'text': row[2]}
             async for row in cursor
         ]
 
     await ws.send_json({'type': 'refresh', 'chatid': chatid, 'data': messages})
-
-def datetimeToJavascriptString(dt):
-    return str(dt) # TODO
 
 async def handle_new_message(app, chatid, message):
     print('Called handle_new_message(chatid=%s, message=%s)' % (chatid, message))
@@ -100,7 +97,7 @@ async def handle_new_message(app, chatid, message):
         notify_payload = {
             'chatid': chatid, 
             'user': message['user'],
-            'time': datetimeToJavascriptString(now), 
+            'time': now.isoformat(), 
             'text': message['text']
         }
         await cursor.execute('NOTIFY new_message, %s', (json.dumps(notify_payload), ))

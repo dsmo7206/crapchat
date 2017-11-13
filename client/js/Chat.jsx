@@ -15,9 +15,8 @@ class Chat extends React.Component {
         if (event.keyCode != 13) {
             return; // We only care if Enter was pressed
         }
-
-        console.log('Pressed enter; text is "' + event.target.value + '"');
         this.props.requestNewMessage(this.props.chatid, event.target.value);
+        event.target.value = ''; // Clear the input
     }
 
     render() {
