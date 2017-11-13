@@ -1,0 +1,11 @@
+.chat {
+    background-color: yellow;
+}
+
+.chat-message {
+    border-style: dashed;
+}
+
+.messages {
+    background-color: red;
+}
