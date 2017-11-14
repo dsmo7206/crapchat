@@ -107,26 +107,22 @@ async def db_listen(app):
             await cursor.execute('LISTEN new_message')
             while True:
                 msg = await conn.notifies.get()
-                if msg.payload == 'finish':
-                    return
-                else:
-                    payload = json.loads(msg.payload)
-                    chatid = payload['chatid']
+                payload = json.loads(msg.payload)
+                chatid = payload['chatid']
 
-                    # TODO: log
-
-                    new_message_object = {
-                        'type': 'new_message', 
-                        'chatid': chatid, 
-                        'data': {
-                            'user': payload['user'],
-                            'time': payload['time'],
-                            'text': payload['text']
-                        }
+                # TODO: log
+                new_message_object = {
+                    'type': 'new_message', 
+                    'chatid': chatid, 
+                    'data': {
+                        'user': payload['user'],
+                        'time': payload['time'],
+                        'text': payload['text']
                     }
+                }
 
-                    for ws in app['chatid_to_websockets'][chatid]:
-                        await ws.send_json(new_message_object)
+                for ws in app['chatid_to_websockets'][chatid]:
+                    await ws.send_json(new_message_object)
 
     except asyncio.CancelledError:
         pass
