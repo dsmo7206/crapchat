@@ -1,17 +1,19 @@
 import React from "react";
 import { Chat } from "./Chat";
+import { ChatSummary } from "./ChatSummary";
+import { NullChat } from "./NullChat";
 
 class App extends React.Component {
     constructor() {
         super();
 
         // messageMap maps a chatid (int) to an array of messages (strings)
-        this.state = {messageMap: new Map()};
+        this.state = {messageMap: new Map(), selectedChatid: null};
 
         this.onSocketMessage = this.onSocketMessage.bind(this);
-        this.createNewChat = this.createNewChat.bind(this);
-        this.requestRefresh = this.requestRefresh.bind(this);
+        this.joinChat = this.joinChat.bind(this);
         this.requestNewMessage = this.requestNewMessage.bind(this);
+        this.onSummaryClicked = this.onSummaryClicked.bind(this);
     }
 
     componentDidMount() {
@@ -22,9 +24,12 @@ class App extends React.Component {
         this.socket.onmessage = this.onSocketMessage;
 
         this.socket.onopen = () => { 
-            this.createNewChat(123); 
-            this.createNewChat(124); 
+            this.joinChat(123); 
+            this.joinChat(124); 
+            this.joinChat(125); 
         };
+
+        this.setState({selectedChatid: 123});
     }
 
     onSocketMessage(event) {
@@ -37,18 +42,20 @@ class App extends React.Component {
         else if (data.type === 'new_message')
         {
             messageMap.set(data.chatid, messageMap.get(data.chatid).concat(data.data));
+            console.log('got new message for chat ' + data.chatid + ': ' + data.data);
         }
         this.setState({messageMap: messageMap});
     }
 
-    createNewChat(chatid) {
+    joinChat(chatid) {
         let messageMap = new Map(this.state.messageMap);
         messageMap.set(chatid, []);
         this.setState({messageMap: messageMap});
+        this.socket.send(JSON.stringify({'type': 'refresh', 'chatid': chatid}));
     }
 
-    requestRefresh(chatid) {
-        this.socket.send(JSON.stringify({'type': 'refresh', 'chatid': chatid}));
+    onSummaryClicked(chatid) {
+        this.setState({selectedChatid: chatid});
     }
 
     requestNewMessage(chatid, message) {
@@ -61,22 +68,53 @@ class App extends React.Component {
 
     render() {
         const messagesArray = Array.from(this.state.messageMap.entries());
-        const chatItems = messagesArray.map((item) => {
+
+        console.log('Called App.render, selectedChatid=' + this.state.selectedChatid);
+
+        const summaryItems = messagesArray.map((item) => {
+            // item[1] is the message array
+            const hasActivity = (item[1].length > 0);
+            const lastMessage = hasActivity ? item[1][item[1].length-1] : null;
+
             return (
                 <li key={item[0]}>
-                    <Chat 
+                    <ChatSummary 
                         chatid={item[0]} 
-                        messages={item[1]} 
-                        requestRefresh={() => {this.requestRefresh(item[0])}}
-                        requestNewMessage={this.requestNewMessage}
+                        hasActivity={hasActivity} 
+                        lastMessage={lastMessage}
+                        isSelected={this.state.selectedChatid == item[0]}
+                        onClicked={this.onSummaryClicked}
                     />
                 </li>
             );
         });
 
+        const selectedChatMessages = this.state.messageMap.get(this.state.selectedChatid);
+
+        const chatItem = (this.state.selectedChatid == null) ? 
+            <NullChat/> : 
+            (selectedChatMessages === undefined) ? 
+            (<p>Loading...</p>) :
+            <Chat
+                chatid={this.state.selectedChatid} 
+                messages={selectedChatMessages} 
+                requestNewMessage={this.requestNewMessage}
+            />
+        ;
+
         return (
-            <div>
-                <ul>{chatItems}</ul>
+            <div className="app">
+                <div className="app-header">
+                    <p>App header!</p>
+                </div>
+                <div className="app-main">
+                    <div className="panel-summaries">
+                        <ul>{summaryItems}</ul>
+                    </div>
+                    <div className="panel-chat">
+                        {chatItem}
+                    </div>
+                </div>
             </div>
         );
     }

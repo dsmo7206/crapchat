@@ -7,10 +7,6 @@ class Chat extends React.Component {
         this.inputOnKeyDown = this.inputOnKeyDown.bind(this);
     }
 
-    componentDidMount() {
-        this.props.requestRefresh();
-    }
-
     inputOnKeyDown(event) {
         if (event.keyCode != 13) {
             return; // We only care if Enter was pressed
@@ -32,9 +28,7 @@ class Chat extends React.Component {
                 <div className="chat-messages">
                     <ul>{listItems}</ul>
                 </div>
-                <div className="chat-input">
-                    <input onKeyDown={this.inputOnKeyDown}/>
-                </div>
+                <input className="chat-input" placeholder="Enter your message..." onKeyDown={this.inputOnKeyDown}/>
             </div>
         );
     }

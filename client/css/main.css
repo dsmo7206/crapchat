@@ -1,11 +1,65 @@
+body {
+    font-family: Arial, Helvetica, sans-serif
+}
+
 .chat {
-    background-color: yellow;
 }
 
 .chat-message {
     border-style: dashed;
 }
 
-.messages {
-    background-color: red;
+.chat-messages {
+    overflow: scroll;
+}
+
+.chat-input {
+    width: 100%;
+}
+
+.app {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: stretch;
+    width: 95%;
+}
+
+.app-main {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: stretch;
+    height: 95%;
+}
+
+.panel-summaries {
+    flex: 1 1 25%;
+    overflow: scroll;
+}
+
+.panel-chat {
+    flex: 3 3 75%;
+}
+
+.chat-summary {
+    
+}
+
+ul {
+    list-style-type: none;
+}
+
+.chat-summary:hover {
+    background-color: #eeeeee;
+}
+
+.chat-summary-selected {
+    background-color: lightgray;
+}
+
+.chat-summary-message {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }

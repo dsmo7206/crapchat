@@ -13,6 +13,7 @@ import datetime
 import jinja2
 import json
 import pytz
+import sys
 
 from aiohttp import web as aiohttp_web
 from collections import defaultdict
@@ -31,6 +32,7 @@ async def handle_new_chat(request):
 
     await ws.prepare(request)
     async for msg in ws:
+        # TODO: log
         if msg.type == aiohttp.WSMsgType.TEXT:
             if msg.data == 'close':
                 await ws.close()
@@ -38,8 +40,7 @@ async def handle_new_chat(request):
                 try:
                     data = json.loads(msg.data)
                 except:
-                    print('Problem parsing JSON')
-                    continue
+                    continue # TODO: log
 
                 chatid = data['chatid']
 
@@ -52,17 +53,16 @@ async def handle_new_chat(request):
                 elif data['type'] == 'new_message':
                     asyncio.ensure_future(handle_new_message(request.app, chatid, data['message']))
                 else:
-                    print('Invalid data: %s' % data)
+                    pass # TODO: log
 
         elif msg.type == aiohttp.WSMsgType.ERROR:
-            print('ws closed with exception %s' % ws.exception())
-    print('ws closed')
+            pass # TODO: log
 
     for websocket_set in request.app['chatid_to_websockets'].values():
         try:
             websocket_set.remove(ws)
         except KeyError:
-            pass
+            pass # Expected when websocket isn't listening to chat
     request.app['all_websockets'].remove(ws)
 
     return ws
@@ -81,8 +81,6 @@ async def handle_refresh(app, ws, chatid):
     await ws.send_json({'type': 'refresh', 'chatid': chatid, 'data': messages})
 
 async def handle_new_message(app, chatid, message):
-    print('Called handle_new_message(chatid=%s, message=%s)' % (chatid, message))
-
     with (await app['db_conn_pool'].cursor()) as cursor:
         now = datetime.datetime.now(pytz.utc)
 
@@ -113,8 +111,9 @@ async def db_listen(app):
                     return
                 else:
                     payload = json.loads(msg.payload)
-                    print('Notification received: %s' % msg.payload)
                     chatid = payload['chatid']
+
+                    # TODO: log
 
                     new_message_object = {
                         'type': 'new_message', 
