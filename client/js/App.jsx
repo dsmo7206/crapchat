@@ -9,7 +9,8 @@ class App extends React.Component {
     constructor() {
         super();
 
-        // messageMap maps a chatid (int) to an array of messages (strings)
+        // Now, messageMap maps a chatid (int) to an array of messages (strings)
+        // Instead, should be something like:
         // this.state has the following keys:
         // - selectedChatId (self explanatory)
         // - messages_<chatid>: a list of strings
@@ -29,7 +30,7 @@ class App extends React.Component {
             transition: 'scale'
         }
 
-        this.showAlert = this.showAlert.bind(this);
+        this.showError = this.showError.bind(this);
         this.onSocketMessage = this.onSocketMessage.bind(this);
         this.joinChat = this.joinChat.bind(this);
         this.leaveChat = this.leaveChat.bind(this);
@@ -53,11 +54,11 @@ class App extends React.Component {
         };
     }
 
-    showAlert(text) {
-        this.msg.show(text, {
+    showError(text) {
+        this.msg.error(text, {
             time: 2000,
-            type: 'success',
-            icon: <img src="path/to/some/img/32x32.png"/>
+            //type: 'success',
+            //icon: <img src="path/to/some/img/32x32.png"/>
         })
     }
 
@@ -79,7 +80,6 @@ class App extends React.Component {
             else if (data.type === 'new_message')
             {
                 messageMap.set(data.chatid, messageMap.get(data.chatid).concat(data.data));
-                console.log('got new message for chat ' + data.chatid + ': ' + data.data);
             }
             this.setState({messageMap: messageMap});
         }
@@ -91,7 +91,7 @@ class App extends React.Component {
 
         if (this.state.messageMap.has(chatid))
         {
-            this.showAlert('You are already in this chat!');
+            this.showError('You are already in this chat!');
             return;
         }
 
@@ -186,7 +186,7 @@ class App extends React.Component {
 
         return (
             <div className="app">
-                <AlertContainer ref={a => this.msg = a} {...this.alertOptions} />
+                <AlertContainer ref={obj => this.msg = obj} {...this.alertOptions} />
                 <div className="app-header">
                     <p>App header!</p>
                 </div>

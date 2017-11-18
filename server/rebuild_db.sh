@@ -32,7 +32,6 @@ psql crapchat << EOF
     INSERT INTO chats (id, name) VALUES (0, 'First chat');
     INSERT INTO chats (id, name) VALUES (1, 'Second chat');
     INSERT INTO inchat (id, chatid, userid) VALUES (0, 0, 0);
-    INSERT INTO inchat (id, chatid, userid) VALUES (1, 1, 0);
     INSERT INTO messages (id, chatid, userid, write_time, text) VALUES (0, 0, 0, now(), 'test message');
 
     COMMIT;
