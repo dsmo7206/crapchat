@@ -5,7 +5,7 @@ class ChatSummary extends React.Component {
         const message = (
             this.props.hasActivity ? 
             this.props.lastMessage.text :
-            '(No activity)'
+            '(No messages)'
         );
 
         const summaryClassName = (
