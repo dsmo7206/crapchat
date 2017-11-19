@@ -1,5 +1,7 @@
 import React from "react";
 
+// This class is shown in the main chat pane when no Chat is selected
+
 class NullChat extends React.Component {
     render() {
         return (

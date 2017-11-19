@@ -29,8 +29,6 @@ async def notify(cursor, payload_object):
     await cursor.execute('NOTIFY channel, %s', (json.dumps(payload_object), ))
 
 async def handle_client(request):
-    print('handle_client called, request=%r' % request)
-
     ws = aiohttp_web.WebSocketResponse()
 
     userid = request.match_info.get('userid', 0) # TODO get userid from auth
@@ -238,8 +236,7 @@ def make_app():
     
     # All references to app.router.static in html templates
     # will point to the given directory.
-    #app.router.add_static('/static', '../client', name='static', append_version=True)
-    app.router.add_static('/static', '../client', name='static')
+    app.router.add_static('/static', '../client', name='static', append_version=True)
     
     # All GETs, POSTs, etc go here
     app.router.add_get('/', handle_root)

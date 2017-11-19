@@ -1,5 +1,7 @@
 import React from "react";
 import AlertContainer from "react-alert";
+
+import { AppHeader } from "./AppHeader";
 import { Chat } from "./Chat";
 import { ChatSummary } from "./ChatSummary";
 import { ChatFinder } from "./ChatFinder";
@@ -67,7 +69,6 @@ class App extends React.Component {
 
         if (data.type === 'chat_suggestions')
         {
-            console.log('got chat suggestions: ' + data.data);
             this.setState({findChatSuggestions: data.data});
         }
         else
@@ -87,8 +88,6 @@ class App extends React.Component {
 
     joinChat(chatid) {
         // Call this when we are opening a new chat
-        console.log('chatid to join: ' + chatid);
-
         if (this.state.messageMap.has(chatid))
         {
             this.showError('You are already in this chat!');
@@ -188,7 +187,7 @@ class App extends React.Component {
             <div className="app">
                 <AlertContainer ref={obj => this.msg = obj} {...this.alertOptions} />
                 <div className="app-header">
-                    <p>App header!</p>
+                    <AppHeader/>
                 </div>
                 <div className="app-main">
                     <div className="panel-summaries">
