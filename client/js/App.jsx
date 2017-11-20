@@ -19,6 +19,7 @@ class App extends React.Component {
         // - inchat_<chatid>: a list of userids in the current chat
         //
         this.state = {
+            connected: false,
             messageMap: new Map(), 
             selectedChatid: null,
             findChatSuggestions: []
@@ -50,10 +51,12 @@ class App extends React.Component {
         this.socket.onmessage = this.onSocketMessage;
 
         this.socket.onopen = () => { 
-            //this.joinChat(123); 
-            //this.joinChat(124); 
-            //this.joinChat(125); 
+            this.setState({connected: true});
         };
+
+        this.socket.onclose = () => {
+            this.setState({connected: false});
+        }
     }
 
     showError(text) {
@@ -139,6 +142,11 @@ class App extends React.Component {
     }
 
     render() {
+        if (!this.state.connected)
+        {
+            return <div>Not connected</div>;
+        }
+
         const messagesArray = Array.from(this.state.messageMap.entries());
 
         const findChatInput = (

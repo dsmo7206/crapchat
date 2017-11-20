@@ -76,14 +76,28 @@ async def handle_connect(app, ws, userid):
 
         # Now check all chats the user is part of and send them
         await cursor.execute(
-            'SELECT chatid FROM inchat WHERE userid=%s',
+            'SELECT i.chatid, c.name FROM inchat i INNER JOIN chats c ON i.chatid=c.id WHERE i.userid=%s',
             (userid, )
         )
-        chatids = [row[0] async for row in cursor]
+        chat_data = {
+            row[0]: {'name': row[1], 'messages': []}
+            async for row in cursor
+        }
+        chatids = chat_data.keys()
+
+        await cursor.execute(
+            'SELECT chatid, userid, write_time, text FROM messages WHERE chatid IN %s',
+            (tuple(chat_data.keys()), )
+        )
+
+        async for row in cursor:
+            chat_data[row[0]]['messages'].append({'user': row[1], 'write_time': row[2].isoformat(), 'text': row[3]})
+
 
         for chatid in chatids:
             app['chatid_to_websockets'][chatid].add(ws)
 
+            '''
             await cursor.execute(
                 'SELECT userid, write_time, text FROM messages WHERE chatid=%s', 
                 (chatid, )
@@ -93,6 +107,8 @@ async def handle_connect(app, ws, userid):
                 async for row in cursor
             ]
 
+            '''
+            messages = chat_data[chatid]['messages']
             await ws.send_json({'type': 'refresh', 'chatid': chatid, 'data': messages})
 
         await notify(cursor, {'type': 'user_connected', 'userid': userid})
