@@ -23,7 +23,7 @@ class Chat extends React.Component {
         return (
             <div className="chat">
                 <div className="chat-heading">
-                    Chat {this.props.chatid}: got {this.props.messages.length} messages!
+                    {this.props.name}: got {this.props.messages.length} messages!
                 </div>
                 <div className="chat-messages">
                     <ul>{listItems}</ul>

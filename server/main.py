@@ -74,43 +74,16 @@ async def handle_connect(app, ws, userid):
             (userid, )
         )
 
-        # Now check all chats the user is part of and send them
-        await cursor.execute(
-            'SELECT i.chatid, c.name FROM inchat i INNER JOIN chats c ON i.chatid=c.id WHERE i.userid=%s',
-            (userid, )
-        )
-        chat_data = {
-            row[0]: {'name': row[1], 'messages': []}
-            async for row in cursor
-        }
-        chatids = chat_data.keys()
+        # Now check all chats the user is part of
+        await cursor.execute('SELECT chatid FROM inchat WHERE userid=%s', (userid, ))
+        chatids = tuple([row[0] async for row in cursor]) # Why can't I use a tuple directly?
 
-        await cursor.execute(
-            'SELECT chatid, userid, write_time, text FROM messages WHERE chatid IN %s',
-            (tuple(chat_data.keys()), )
-        )
-
-        async for row in cursor:
-            chat_data[row[0]]['messages'].append({'user': row[1], 'write_time': row[2].isoformat(), 'text': row[3]})
-
+        chat_data = await get_chat_data(cursor, chatids)
 
         for chatid in chatids:
             app['chatid_to_websockets'][chatid].add(ws)
 
-            '''
-            await cursor.execute(
-                'SELECT userid, write_time, text FROM messages WHERE chatid=%s', 
-                (chatid, )
-            )
-            messages = [
-                {'user': row[0], 'time': row[1].isoformat(), 'text': row[2]}
-                async for row in cursor
-            ]
-
-            '''
-            messages = chat_data[chatid]['messages']
-            await ws.send_json({'type': 'refresh', 'chatid': chatid, 'data': messages})
-
+        await ws.send_json({'type': 'refresh', 'chat_data': chat_data})
         await notify(cursor, {'type': 'user_connected', 'userid': userid})
 
 async def handle_join_chat(app, ws, userid, chatid):
@@ -121,7 +94,38 @@ async def handle_join_chat(app, ws, userid, chatid):
             'INSERT INTO inchat (userid, chatid) VALUES (%s, %s)',
             (userid, chatid)
         )
+
+        # Get data for this chat alone
+        chat_data = await get_chat_data(cursor, (chatid, ))
+        app['chatid_to_websockets'][chatid].add(ws)
+
+        # Send partial refresh to user
+        await ws.send_json({'type': 'refresh', 'chat_data': chat_data})
+
         await notify(cursor, {'type': 'user_joined_chat', 'userid': userid, 'chatid': chatid})
+
+async def get_chat_data(cursor, chatids):
+    # Get chat names
+    await cursor.execute('SELECT id, name FROM chats WHERE id IN %s', (chatids, ))
+    chat_data = {
+        row[0]: {'name': row[1], 'messages': []} 
+        async for row in cursor
+    }
+
+    # Get chat messages
+    await cursor.execute(
+        'SELECT chatid, userid, write_time, text FROM messages WHERE chatid IN %s',
+        (tuple(chat_data.keys()), )
+    )
+    async for row in cursor:
+        chat_data[row[0]]['messages'].append({'user': row[1], 'write_time': row[2].isoformat(), 'text': row[3]})
+
+    # To ease reading the data on the client side, we will convert the Python dict
+    # into a list and move the chatid (the key) into each value.
+    return [
+        {'chatid': chatid, **value}
+        for chatid, value in chat_data.items()
+    ]
 
 async def handle_leave_chat(app, ws, userid, chatid):
     with (await app['db_conn_pool'].cursor()) as cursor:
@@ -131,7 +135,7 @@ async def handle_leave_chat(app, ws, userid, chatid):
         )
         await notify(cursor, {'type': 'user_left_chat', 'userid': userid, 'chatid': chatid})
 
-    app['chatid_to_websockets'].remove(ws)
+    app['chatid_to_websockets'][chatid].remove(ws)
 
 async def handle_disconnect(app, ws, userid):
     with (await app['db_conn_pool'].cursor()) as cursor:

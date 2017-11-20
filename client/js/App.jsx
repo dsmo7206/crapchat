@@ -11,16 +11,10 @@ class App extends React.Component {
     constructor() {
         super();
 
-        // Now, messageMap maps a chatid (int) to an array of messages (strings)
-        // Instead, should be something like:
-        // this.state has the following keys:
-        // - selectedChatId (self explanatory)
-        // - messages_<chatid>: a list of strings
-        // - inchat_<chatid>: a list of userids in the current chat
-        //
         this.state = {
             connected: false,
             messageMap: new Map(), 
+            chatNameMap: new Map(),
             selectedChatid: null,
             findChatSuggestions: []
         };
@@ -74,18 +68,29 @@ class App extends React.Component {
         {
             this.setState({findChatSuggestions: data.data});
         }
-        else
+        else if (data.type === 'refresh')
         {
             let messageMap = new Map(this.state.messageMap);
-            if (data.type === 'refresh')
+            let chatNameMap = new Map(this.state.chatNameMap);
+
+            for (let i = 0; i < data.chat_data.length; ++i)
             {
-                messageMap.set(data.chatid, data.data);
+                messageMap.set(data.chat_data[i].chatid, data.chat_data[i].messages);
+                chatNameMap.set(data.chat_data[i].chatid, data.chat_data[i].name);
             }
-            else if (data.type === 'new_message')
-            {
-                messageMap.set(data.chatid, messageMap.get(data.chatid).concat(data.data));
-            }
+
             this.setState({messageMap: messageMap});
+            this.setState({chatNameMap: chatNameMap});
+        }
+        else if (data.type === 'new_message')
+        {
+            let messageMap = new Map(this.state.messageMap);
+            messageMap.set(data.chatid, messageMap.get(data.chatid).concat(data.data));
+            this.setState({messageMap: messageMap});
+        }
+        else
+        {
+            console.error('Got invalid data.type: ' + data.type);
         }
     }
 
@@ -96,14 +101,15 @@ class App extends React.Component {
             this.showError('You are already in this chat!');
             return;
         }
-
-        let messageMap = new Map(this.state.messageMap);
-        messageMap.set(chatid, {'name': 'Chat ' + chatid, 'messages': []});
-        this.setState({messageMap: messageMap});
         this.socket.send(JSON.stringify({'type': 'join_chat', 'chatid': chatid}))
     }
 
     leaveChat(chatid) {
+        if (this.state.selectedChatid == chatid)
+        {
+            this.setState({selectedChatid: null});
+        }
+
         this.socket.send(JSON.stringify({'type': 'leave_chat', 'chatid': chatid}))
 
         // Is the call above async? If so, it's possible that after calling,
@@ -119,6 +125,7 @@ class App extends React.Component {
     }
 
     onSummaryClicked(chatid) {
+        console.log('onSummaryClicked: ' + chatid);
         this.setState({selectedChatid: chatid});
     }
 
@@ -169,10 +176,12 @@ class App extends React.Component {
                 <li key={item[0]}>
                     <ChatSummary 
                         chatid={item[0]} 
+                        name={this.state.chatNameMap.get(item[0])}
                         hasActivity={hasActivity} 
                         lastMessage={lastMessage}
                         isSelected={this.state.selectedChatid == item[0]}
                         onClicked={this.onSummaryClicked}
+                        leaveChat={this.leaveChat}
                     />
                 </li>
             );
@@ -180,12 +189,17 @@ class App extends React.Component {
 
         const selectedChatMessages = this.state.messageMap.get(this.state.selectedChatid);
 
+        console.log('called app.render: selectedChatMessages = ');
+        console.log(selectedChatMessages);
+        console.log('and selectedChatid = ' + this.state.selectedChatid);
+
         const chatItem = (this.state.selectedChatid == null) ?
             <NullChat/> : 
             (selectedChatMessages === undefined) ? 
             (<p>Loading...</p>) :
             <Chat
                 chatid={this.state.selectedChatid} 
+                name={this.state.chatNameMap.get(this.state.selectedChatid)}
                 messages={selectedChatMessages} 
                 requestNewMessage={this.requestNewMessage}
             />
