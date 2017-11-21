@@ -54,7 +54,7 @@ class ChatFinder extends React.Component {
 	render() {
 		const { value } = this.state;
 		const inputProps = {
-			placeholder: "Enter chat name",
+			placeholder: "Enter chat name to find...",
 			value,
 			onChange: this.onChange
 		};

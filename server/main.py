@@ -37,7 +37,6 @@ async def handle_client(request):
     await ws.prepare(request)
     async for msg in ws:
         # TODO: log
-        print('Got message %s' % repr(msg))
         if msg.type == aiohttp.WSMsgType.TEXT:
             if msg.data == 'close':
                 await ws.close()
@@ -105,6 +104,16 @@ async def handle_join_chat(app, ws, userid, chatid):
         await notify(cursor, {'type': 'user_joined_chat', 'userid': userid, 'chatid': chatid})
 
 async def get_chat_data(cursor, chatids):
+    '''
+    Returns a list of dicts, where each dict contains:
+        chatid: The chat id
+        name: The chat name
+        messages: A list of dicts with keys ('user', 'write_time', 'text')
+    '''
+
+    if not chatids:
+        return [] # The query directly below will fail on an empty tuple
+
     # Get chat names
     await cursor.execute('SELECT id, name FROM chats WHERE id IN %s', (chatids, ))
     chat_data = {
@@ -170,7 +179,7 @@ async def handle_new_message(app, chatid, userid, message):
             'type': 'new_message',
             'chatid': chatid, 
             'userid': userid,
-            'time': now.isoformat(), 
+            'write_time': now.isoformat(), 
             'text': message
         }
         await notify(cursor, notify_payload)
@@ -197,8 +206,6 @@ async def db_listen(app):
                 msg = await conn.notifies.get()
                 payload = json.loads(msg.payload)
 
-                print('GOT NOTIFY: %s' % repr(payload))
-
                 if payload['type'] == 'new_message':
                     chatid = payload['chatid']
 
@@ -208,7 +215,7 @@ async def db_listen(app):
                         'chatid': chatid, 
                         'data': {
                             'userid': payload['userid'],
-                            'time': payload['time'],
+                            'write_time': payload['write_time'],
                             'text': payload['text']
                         }
                     }

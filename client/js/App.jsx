@@ -16,7 +16,8 @@ class App extends React.Component {
             messageMap: new Map(), 
             chatNameMap: new Map(),
             selectedChatid: null,
-            findChatSuggestions: []
+            findChatSuggestions: [],
+            today: new Date()
         };
 
         this.alertOptions = {
@@ -33,7 +34,6 @@ class App extends React.Component {
         this.leaveChat = this.leaveChat.bind(this);
         this.requestNewMessage = this.requestNewMessage.bind(this);
         this.onSummaryClicked = this.onSummaryClicked.bind(this);
-        this.findChatOnKeyDown = this.findChatOnKeyDown.bind(this);
         this.requestChatSuggestions = this.requestChatSuggestions.bind(this);
     }
 
@@ -125,12 +125,7 @@ class App extends React.Component {
     }
 
     onSummaryClicked(chatid) {
-        console.log('onSummaryClicked: ' + chatid);
         this.setState({selectedChatid: chatid});
-    }
-
-    findChatOnKeyDown(event) {
-        console.log('find chat got event: ' + event);
     }
 
     requestNewMessage(chatid, message) {
@@ -177,6 +172,7 @@ class App extends React.Component {
                     <ChatSummary 
                         chatid={item[0]} 
                         name={this.state.chatNameMap.get(item[0])}
+                        today={this.state.today}
                         hasActivity={hasActivity} 
                         lastMessage={lastMessage}
                         isSelected={this.state.selectedChatid == item[0]}
@@ -188,10 +184,6 @@ class App extends React.Component {
         });
 
         const selectedChatMessages = this.state.messageMap.get(this.state.selectedChatid);
-
-        console.log('called app.render: selectedChatMessages = ');
-        console.log(selectedChatMessages);
-        console.log('and selectedChatid = ' + this.state.selectedChatid);
 
         const chatItem = (this.state.selectedChatid == null) ?
             <NullChat/> : 
