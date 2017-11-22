@@ -12,14 +12,17 @@ import aiopg
 import datetime
 import jinja2
 import json
+import jwt
 import pytz
 import sys
 
 from aiohttp import web as aiohttp_web
 from collections import defaultdict
+from passlib.hash import argon2
 
 APP_NAME = 'Crapchat!'
 DB_CONN_STRING = 'dbname=crapchat'
+JWT_SECRET = 'secret' # Change this or load from database instead - it MUST be private
 
 @aiohttp_jinja2.template('index.html')
 def handle_root(request):
@@ -28,6 +31,45 @@ def handle_root(request):
 async def notify(cursor, payload_object):
     await cursor.execute('NOTIFY channel, %s', (json.dumps(payload_object), ))
 
+async def login(app, username, password):
+    '''
+    Returns a JWT (JSON Web Token) to be sent to the client
+    if the username/password combination is valid, otherwise
+    returns None.
+    '''
+    # Firstly fetch the Argon2 password digest from the database
+    with (await app['db_conn_pool'].cursor()) as cursor:
+        await cursor.execute(
+            'SELECT id, password_hash FROM users WHERE username=%s',
+            (username, )
+        )
+        data = [row async for row in cursor]
+    
+    if not data:
+        return None # User doesn't exist
+
+    # data must have length 1 due to username uniqueness
+    userid, password_hash = data[0]
+
+    try:
+        if not argon2.verify(password, data[0]):
+            return None
+    except:
+        return None
+
+    # Password is correct
+    return jwt.encode({'userid': userid}, JWT_SECRET, algorithm='HS256')
+
+def userid_from_token(token):
+    '''
+    Gets the userid from the JWT or returns None if invalid.
+    '''
+    obj = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
+    try:
+        return obj['userid']
+    except:
+        return None
+
 async def handle_client(request):
     ws = aiohttp_web.WebSocketResponse()
 
@@ -35,6 +77,7 @@ async def handle_client(request):
     asyncio.ensure_future(handle_connect(request.app, ws, userid))
 
     await ws.prepare(request)
+
     async for msg in ws:
         # TODO: log
         if msg.type == aiohttp.WSMsgType.TEXT:
@@ -244,6 +287,16 @@ async def cleanup_background_tasks(app):
     app['db_listener'].cancel()
     await app['db_listener']
 
+async def fix_user(app):
+    username = 'dsmo7206'
+    password_hash = argon2.hash('hello')
+
+    with (await app['db_conn_pool'].cursor()) as cursor:
+        await cursor.execute(
+            'UPDATE users SET password_hash=%s WHERE username=%s',
+            (password_hash, username)
+        )
+
 def make_app():
     app = aiohttp_web.Application()
 
@@ -256,6 +309,8 @@ def make_app():
     )
     app['all_websockets'] = []
     app['chatid_to_websockets'] = defaultdict(set)
+
+    asyncio.get_event_loop().run_until_complete(asyncio.ensure_future(fix_user(app)))
 
     # All aiohttp_jinja2 decorators will look in the given folder
     # when searching for html files

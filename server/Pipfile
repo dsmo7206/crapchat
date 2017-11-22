@@ -13,6 +13,9 @@ aiohttp = "*"
 "jinja2" = "*"
 aiopg = "*"
 pytz = "*"
+pyjwt = "*"
+passlib = "*"
+"argon2-cffi" = "*"
 
 
 [dev-packages]
