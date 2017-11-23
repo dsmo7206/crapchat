@@ -69,9 +69,8 @@ def userid_from_token(token):
     '''
     Gets the userid from the JWT or returns None if invalid.
     '''
-    obj = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
     try:
-        return obj['userid']
+        return jwt.decode(token, JWT_SECRET, algorithms=['HS256'])['userid']
     except:
         return None
 
