@@ -292,14 +292,15 @@ async def cleanup_background_tasks(app):
     await app['db_listener']
 
 # TODO: Remove, see note in make_app
-async def fix_user(app):
-    username = 'dsmo7206'
-    password_hash = argon2.hash('hello')
-
+async def fix_users(app):
     with (await app['db_conn_pool'].cursor()) as cursor:
         await cursor.execute(
             'UPDATE users SET password_hash=%s WHERE username=%s',
-            (password_hash, username)
+            (argon2.hash('password0'), 'user0')
+        )
+        await cursor.execute(
+            'UPDATE users SET password_hash=%s WHERE username=%s',
+            (argon2.hash('password1'), 'user1')
         )
 
 def make_app():
@@ -318,7 +319,7 @@ def make_app():
     # TODO: Remove this once registration is implemented;
     # this is only here because for some reason the password_hash field doesn't set
     # properly in rebuild_db.sh, possibly because it needs escaping
-    asyncio.get_event_loop().run_until_complete(asyncio.ensure_future(fix_user(app)))
+    asyncio.get_event_loop().run_until_complete(asyncio.ensure_future(fix_users(app)))
 
     # All aiohttp_jinja2 decorators will look in the given folder
     # when searching for html files

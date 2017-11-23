@@ -36,16 +36,21 @@ psql crapchat << EOF
     );
     INSERT INTO users (id, username, realname, password_hash, connected) VALUES (
         0, 
-        'dsmo7206', 
-        'David Smoker', 
-        '$argon2i$v=19$m=512,t=10,p=2$ofReC6H0HkMohXBOSYnReg$VCiALIcHdRF3IKYsFn3iXg',
+        'user0', 
+        'Firsty McFirstface', 
+        '',
+        0
+    );
+    INSERT INTO users (id, username, realname, password_hash, connected) VALUES (
+        1, 
+        'user1', 
+        'Second McTwoface', 
+        '',
         0
     );
     INSERT INTO chats (id, name) VALUES (0, 'First chat');
     INSERT INTO chats (id, name) VALUES (1, 'Second chat');
     INSERT INTO chats (id, name) VALUES (123, 'A later chat');
-    INSERT INTO inchat (id, chatid, userid) VALUES (0, 123, 0);
-    INSERT INTO messages (id, chatid, userid, write_time, text) VALUES (0, 0, 0, now(), 'test message');
 
     COMMIT;
 EOF
