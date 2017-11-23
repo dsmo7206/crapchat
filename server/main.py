@@ -31,34 +31,39 @@ def handle_root(request):
 async def notify(cursor, payload_object):
     await cursor.execute('NOTIFY channel, %s', (json.dumps(payload_object), ))
 
-async def login(app, username, password):
-    '''
-    Returns a JWT (JSON Web Token) to be sent to the client
-    if the username/password combination is valid, otherwise
-    returns None.
-    '''
+async def handle_login(request):
+    try:
+        username, password = request.headers.get('Authorization').split(':')
+    except:
+        # We expect the Authorization header content to be "username:password",
+        # so if it isn't, we return an error. This shouldn't happen.
+        raise aiohttp_web.HTTPBadRequest()
+    
     # Firstly fetch the Argon2 password digest from the database
-    with (await app['db_conn_pool'].cursor()) as cursor:
+    with (await request.app['db_conn_pool'].cursor()) as cursor:
         await cursor.execute(
             'SELECT id, password_hash FROM users WHERE username=%s',
             (username, )
         )
         data = [row async for row in cursor]
     
-    if not data:
-        return None # User doesn't exist
+    if not data: # The username doesn't exist
+        raise aiohttp_web.HTTPUnauthorized()
 
     # data must have length 1 due to username uniqueness
     userid, password_hash = data[0]
 
     try:
-        if not argon2.verify(password, data[0]):
-            return None
+        if not argon2.verify(password, password_hash):
+            raise aiohttp_web.HTTPUnauthorized() # Wrong password
     except:
-        return None
+        # TODO: log
+        raise aiohttp_web.HTTPUnauthorized() # Malformed password_hash in db
 
-    # Password is correct
-    return jwt.encode({'userid': userid}, JWT_SECRET, algorithm='HS256')
+    # Password is correct, generate token (bytes)
+    token = jwt.encode({'userid': userid}, JWT_SECRET, algorithm='HS256')
+
+    return aiohttp_web.Response(body=token)
 
 def userid_from_token(token):
     '''
@@ -72,11 +77,10 @@ def userid_from_token(token):
 
 async def handle_client(request):
     ws = aiohttp_web.WebSocketResponse()
-
-    userid = request.match_info.get('userid', 0) # TODO get userid from auth
-    asyncio.ensure_future(handle_connect(request.app, ws, userid))
-
     await ws.prepare(request)
+
+    userid = userid_from_token(request.rel_url.query.get('access_token'))
+    await handle_connect(request.app, ws, userid)
 
     async for msg in ws:
         # TODO: log
@@ -89,12 +93,12 @@ async def handle_client(request):
                 except:
                     continue # TODO: log
 
-                if data['type'] == 'join_chat':
+                if data['type'] == 'new_message':
+                    asyncio.ensure_future(handle_new_message(request.app, data['chatid'], userid, data['message']))
+                elif data['type'] == 'join_chat':
                     asyncio.ensure_future(handle_join_chat(request.app, ws, userid, data['chatid']))
                 elif data['type'] == 'leave_chat':
                     asyncio.ensure_future(handle_leave_chat(request.app, ws, userid, data['chatid']))
-                elif data['type'] == 'new_message':
-                    asyncio.ensure_future(handle_new_message(request.app, data['chatid'], userid, data['message']))
                 elif data['type'] == 'get_chat_suggestions':
                     asyncio.ensure_future(handle_get_chat_suggestions(request.app, ws, data['searchString']))
                 else:
@@ -103,7 +107,7 @@ async def handle_client(request):
         elif msg.type == aiohttp.WSMsgType.ERROR:
             pass # TODO: log
             
-    asyncio.ensure_future(handle_disconnect(request.app, ws, userid))
+    await handle_disconnect(request.app, ws, userid)
 
     return ws
 
@@ -322,7 +326,8 @@ def make_app():
     
     # All GETs, POSTs, etc go here
     app.router.add_get('/', handle_root)
-    app.router.add_get('/client/{userid}', handle_client) # TODO: change to auth
+    app.router.add_get('/client', handle_client)
+    app.router.add_post('/login', handle_login)
 
     app.on_startup.append(start_background_tasks)
     app.on_cleanup.append(cleanup_background_tasks)

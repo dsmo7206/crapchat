@@ -5,6 +5,7 @@ import { AppHeader } from "./AppHeader";
 import { Chat } from "./Chat";
 import { ChatSummary } from "./ChatSummary";
 import { ChatFinder } from "./ChatFinder";
+import { LoginPage } from "./LoginPage";
 import { NullChat } from "./NullChat";
 
 class App extends React.Component {
@@ -17,7 +18,8 @@ class App extends React.Component {
             chatNameMap: new Map(),
             selectedChatid: null,
             findChatSuggestions: [],
-            today: new Date()
+            today: new Date(),
+            token: null
         };
 
         this.alertOptions = {
@@ -30,6 +32,8 @@ class App extends React.Component {
 
         this.showError = this.showError.bind(this);
         this.onSocketMessage = this.onSocketMessage.bind(this);
+        this.tryLogin = this.tryLogin.bind(this);
+        this.onLoginResponse = this.onLoginResponse.bind(this);
         this.joinChat = this.joinChat.bind(this);
         this.leaveChat = this.leaveChat.bind(this);
         this.requestNewMessage = this.requestNewMessage.bind(this);
@@ -38,19 +42,6 @@ class App extends React.Component {
     }
 
     componentDidMount() {
-        this.socket = new WebSocket(
-            ((window.location.protocol === "https:") ? 'wss://' : 'ws://') + 
-            window.location.host + "/client/" + 0 // this is the userid - change to auth
-        );
-        this.socket.onmessage = this.onSocketMessage;
-
-        this.socket.onopen = () => { 
-            this.setState({connected: true});
-        };
-
-        this.socket.onclose = () => {
-            this.setState({connected: false});
-        }
     }
 
     showError(text) {
@@ -91,6 +82,51 @@ class App extends React.Component {
         else
         {
             console.error('Got invalid data.type: ' + data.type);
+        }
+    }
+
+    tryLogin(username, password) {
+        let request = new XMLHttpRequest();
+        request.open('POST', '/login', true); // "true" means async
+
+        const app = this; // Create reference for callback below
+
+        request.onreadystatechange = function() {
+            if (request.readyState != 4)
+            {
+                return; // Ignore until done
+            }
+            app.onLoginResponse(request.status, request.statusText, request.response);
+        }
+        request.setRequestHeader('Authorization', username + ':' + password);
+        request.send();
+    }
+
+    onLoginResponse(status, statusText, response) {
+        if (status != 200)
+        {
+            this.loginPage.onLoginFail(statusText);
+            return;
+        }
+
+        // Success!
+        this.loginPage.onLoginSuccess();
+
+        // We use the non-nullness of the token to indicate that we are logged in
+        this.setState({token: response});
+
+        this.socket = new WebSocket(
+            ((window.location.protocol === "https:") ? 'wss://' : 'ws://') + 
+            window.location.host + "/client?access_token=" + response
+        );
+        this.socket.onmessage = this.onSocketMessage;
+
+        this.socket.onopen = () => { 
+            this.setState({connected: true});
+        };
+
+        this.socket.onclose = () => {
+            this.setState({connected: false});
         }
     }
 
@@ -144,6 +180,16 @@ class App extends React.Component {
     }
 
     render() {
+        if (this.state.token == null)
+        {
+            // The user has not logged in yet
+            return (
+                <div className="app">
+                    <LoginPage tryLogin={this.tryLogin} ref={(obj) => {this.loginPage = obj;}}/>
+                </div>
+            );
+        }
+
         if (!this.state.connected)
         {
             return <div>Not connected</div>;
