@@ -33,6 +33,7 @@ class App extends React.Component {
         this.showError = this.showError.bind(this);
         this.onSocketMessage = this.onSocketMessage.bind(this);
         this.tryLogin = this.tryLogin.bind(this);
+        this.logout = this.logout.bind(this);
         this.onLoginResponse = this.onLoginResponse.bind(this);
         this.joinChat = this.joinChat.bind(this);
         this.leaveChat = this.leaveChat.bind(this);
@@ -102,6 +103,11 @@ class App extends React.Component {
         request.send();
     }
 
+    logout() {
+        this.socket.send('logout');
+        this.setState({token: null}); // This will cause the LoginPage to render
+    }
+
     onLoginResponse(status, statusText, response) {
         if (status != 200)
         {
@@ -127,6 +133,7 @@ class App extends React.Component {
 
         this.socket.onclose = () => {
             this.setState({connected: false});
+            this.socket = null;
         }
     }
 
@@ -246,9 +253,7 @@ class App extends React.Component {
         return (
             <div className="app">
                 <AlertContainer ref={obj => this.msg = obj} {...this.alertOptions} />
-                <div className="app-header">
-                    <AppHeader/>
-                </div>
+                <AppHeader logout={this.logout}/>
                 <div className="app-main">
                     <div className="panel-summaries">
                         <ul>{[findChatInput].concat(summaryItems)}</ul>

@@ -37,6 +37,11 @@ body {
     background-color: bisque;
 }
 
+.app-header {
+    display: flex;
+    flex-direction: row;
+}
+
 .app-main {
     display: flex;
     flex-direction: row;

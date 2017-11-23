@@ -85,7 +85,7 @@ async def handle_client(request):
     async for msg in ws:
         # TODO: log
         if msg.type == aiohttp.WSMsgType.TEXT:
-            if msg.data == 'close':
+            if msg.data == 'logout':
                 await ws.close()
             else:
                 try:
@@ -282,7 +282,7 @@ async def db_listen(app):
                     pass # TODO: log
 
     except asyncio.CancelledError:
-        pass
+        conn.close()
 
 async def start_background_tasks(app):
     app['db_listener'] = app.loop.create_task(db_listen(app))
@@ -291,6 +291,7 @@ async def cleanup_background_tasks(app):
     app['db_listener'].cancel()
     await app['db_listener']
 
+# TODO: Remove, see note in make_app
 async def fix_user(app):
     username = 'dsmo7206'
     password_hash = argon2.hash('hello')
@@ -314,6 +315,9 @@ def make_app():
     app['all_websockets'] = []
     app['chatid_to_websockets'] = defaultdict(set)
 
+    # TODO: Remove this once registration is implemented;
+    # this is only here because for some reason the password_hash field doesn't set
+    # properly in rebuild_db.sh, possibly because it needs escaping
     asyncio.get_event_loop().run_until_complete(asyncio.ensure_future(fix_user(app)))
 
     # All aiohttp_jinja2 decorators will look in the given folder
