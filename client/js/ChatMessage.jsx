@@ -4,7 +4,7 @@ class ChatMessage extends React.Component {
     render() {
         return (
             <div className="chat-message">
-                {this.props.user} at {this.props.time}: {this.props.text}
+                {this.props.user.realname} at {this.props.write_time}: {this.props.text}
             </div>
         );
     }

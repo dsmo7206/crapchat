@@ -17,7 +17,19 @@ class Chat extends React.Component {
 
     render() {
         const listItems = this.props.messages.map((item, i) => {
-            return <li key={i}><ChatMessage user={item.user} time={item.time} text={item.text}/></li>
+            console.log('usernamemap is');
+            console.log(this.props.usernameMap);
+            console.log('item is');
+            console.log(item);
+            return (
+                <li key={i}>
+                    <ChatMessage 
+                        user={this.props.usernameMap.get(item.userid)} 
+                        write_time={item.write_time} 
+                        text={item.text}
+                    />
+                </li>
+            );
         });
 
         return (

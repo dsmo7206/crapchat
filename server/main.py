@@ -16,12 +16,15 @@ import jwt
 import pytz
 import sys
 
+import common
+import data
+import listener
+
 from aiohttp import web as aiohttp_web
 from collections import defaultdict
 from passlib.hash import argon2
 
 APP_NAME = 'Crapchat!'
-DB_CONN_STRING = 'dbname=crapchat'
 JWT_SECRET = 'secret' # Change this or load from database instead - it MUST be private
 
 @aiohttp_jinja2.template('index.html')
@@ -63,7 +66,9 @@ async def handle_login(request):
     # Password is correct, generate token (bytes)
     token = jwt.encode({'userid': userid}, JWT_SECRET, algorithm='HS256')
 
-    return aiohttp_web.Response(body=token)
+    return aiohttp_web.Response(
+        body=json.dumps({'userid': userid, 'token': token.decode('utf-8')})
+    )
 
 def userid_from_token(token):
     '''
@@ -95,12 +100,12 @@ async def handle_client(request):
 
                     if data['type'] == 'new_message':
                         asyncio.ensure_future(handle_new_message(request.app, data['chatid'], userid, data['message']))
-                    elif data['type'] == 'join_chat':
-                        asyncio.ensure_future(handle_join_chat(request.app, ws, userid, data['chatid']))
+                    elif data['type'] == 'start_chat':
+                        asyncio.ensure_future(handle_start_chat(request.app, ws, data['userids']))
                     elif data['type'] == 'leave_chat':
                         asyncio.ensure_future(handle_leave_chat(request.app, ws, userid, data['chatid']))
-                    elif data['type'] == 'get_chat_suggestions':
-                        asyncio.ensure_future(handle_get_chat_suggestions(request.app, ws, data['searchString']))
+                    elif data['type'] == 'get_user_suggestions':
+                        asyncio.ensure_future(handle_get_user_suggestions(request.app, ws, userid, data['searchString']))
                     else:
                         pass # TODO: log
 
@@ -126,87 +131,32 @@ async def handle_connect(app, ws, userid):
         await cursor.execute('SELECT chatid FROM inchat WHERE userid=%s', (userid, ))
         chatids = tuple([row[0] async for row in cursor]) # Why can't I use a tuple directly?
 
-        chat_data = await get_chat_data(cursor, chatids)
+        chat_data = await data.get_chat_data(cursor, chatids)
 
-        userids = tuple(set(sum((chat['users'] for chat in chat_data), [])))
-        user_data = await get_user_data(cursor, userids)
-
-        for chatid in chatids:
-            app['chatid_to_websockets'][chatid].add(ws)
-
-        await ws.send_json({'type': 'refresh', 'chat_data': chat_data, 'user_data': user_data})
-        await notify(cursor, {'type': 'user_connected', 'userid': userid})
-
-async def handle_join_chat(app, ws, userid, chatid):
-    app['chatid_to_websockets'][chatid].add(ws)
-
-    with (await app['db_conn_pool'].cursor()) as cursor:
-        await cursor.execute(
-            'INSERT INTO inchat (userid, chatid) VALUES (%s, %s)',
-            (userid, chatid)
+        user_data = await data.get_user_data(
+            cursor, 
+            tuple(set(sum((chat['users'] for chat in chat_data), [])))
         )
 
-        # Get data for this chat alone
-        chat_data = await get_chat_data(cursor, (chatid, ))
-        app['chatid_to_websockets'][chatid].add(ws)
+        app['userid_to_websockets'][userid].add(ws)
 
-        # Send partial refresh to user
-        await ws.send_json({'type': 'refresh', 'chat_data': chat_data})
+        await ws.send_json({'type': 'data_update', 'chat_data': chat_data, 'user_data': user_data})
+        await notify(cursor, {'type': 'user_connected', 'userid': userid})
 
-        await notify(cursor, {'type': 'user_joined_chat', 'userid': userid, 'chatid': chatid})
+async def handle_start_chat(app, ws, userids):
+    with (await app['db_conn_pool'].cursor()) as cursor:
+        await cursor.execute('INSERT INTO chats (name) VALUES (null) RETURNING id')
+        chatid = [row[0] async for row in cursor][0]
 
-async def get_chat_data(cursor, chatids):
-    '''
-    Returns a list of dicts, where each dict contains:
-        chatid: The chat id
-        name: The chat name
-        messages: A list of dicts with keys ('user', 'write_time', 'text')
-    '''
-    if not chatids:
-        return [] # The query directly below will fail on an empty tuple
+        print('Creating new chat with id: %r' % chatid)
 
-    # Get chat names
-    await cursor.execute('SELECT id, name FROM chats WHERE id IN %s', (chatids, ))
-    chat_data = {
-        row[0]: {'name': row[1], 'users': [], 'messages': []} 
-        async for row in cursor
-    }
-
-    # Get users in each chat
-    await cursor.execute(
-        'SELECT chatid, userid FROM inchat WHERE chatid IN %s',
-        (tuple(chat_data.keys()), )
-    )
-    async for row in cursor:
-        chat_data[row[0]]['users'].append(row[1])
-
-    # Get chat messages
-    await cursor.execute(
-        'SELECT chatid, userid, write_time, text FROM messages WHERE chatid IN %s',
-        (tuple(chat_data.keys()), )
-    )
-    async for row in cursor:
-        chat_data[row[0]]['messages'].append({'user': row[1], 'write_time': row[2].isoformat(), 'text': row[3]})
-
-    # To ease reading the data on the client side, we will convert the Python dict
-    # into a list and move the chatid (the key) into each value.
-    return [
-        {'chatid': chatid, **value}
-        for chatid, value in chat_data.items()
-    ]
-
-async def get_user_data(cursor, userids):
-    if not userids:
-        return [] # The query directly below will fail on an empty tuple
-
-    await cursor.execute(
-        'SELECT id, username, realname, connected FROM users WHERE id IN %s',
-        (userids, )
-    )
-    return [
-        {'userid': row[0], 'username': row[1], 'realname': row[2], 'connected': row[3]}
-        async for row in cursor
-    ]
+        # TODO: combine into single query if possible
+        for userid in userids:
+            await cursor.execute(
+                'INSERT INTO inchat (userid, chatid) VALUES (%s, %s)',
+                (userid, chatid)
+            )
+        await notify(cursor, {'type': 'users_joined_chat', 'userids': userids, 'chatid': chatid})
 
 async def handle_leave_chat(app, ws, userid, chatid):
     with (await app['db_conn_pool'].cursor()) as cursor:
@@ -215,8 +165,6 @@ async def handle_leave_chat(app, ws, userid, chatid):
             (userid, chatid)
         )
         await notify(cursor, {'type': 'user_left_chat', 'userid': userid, 'chatid': chatid})
-
-    app['chatid_to_websockets'][chatid].remove(ws)
 
 async def handle_disconnect(app, ws, userid):
     with (await app['db_conn_pool'].cursor()) as cursor:
@@ -227,12 +175,7 @@ async def handle_disconnect(app, ws, userid):
 
         await notify(cursor, {'type': 'user_disconnected', 'userid': userid})
 
-    for chatid, websocket_set in app['chatid_to_websockets'].items():
-        try:
-            websocket_set.remove(ws)
-        except KeyError:
-            pass # Expected when websocket isn't listening to chat
-
+    app['userid_to_websockets'][userid].remove(ws)
     app['all_websockets'].remove(ws)
 
 async def handle_new_message(app, chatid, userid, message):
@@ -256,65 +199,28 @@ async def handle_new_message(app, chatid, userid, message):
         }
         await notify(cursor, notify_payload)
 
-async def handle_get_chat_suggestions(app, ws, searchString):
+async def handle_get_user_suggestions(app, ws, userid, searchString):
     with (await app['db_conn_pool'].cursor()) as cursor:
         await cursor.execute(
-            'SELECT id, name FROM chats WHERE name LIKE %s',
-            ('%%%s%%' % searchString, )
+            '''
+            SELECT id, username, realname, connected FROM users 
+            WHERE username LIKE %s AND id != %s
+            ORDER BY username ASC''',
+            ('%%%s%%' % searchString, userid)
         )
         data = [
-            {'chatid': row[0], 'name': row[1]}
+            {'userid': row[0], 'username': row[1], 'realname': row[2], 'connected': row[3]}
             async for row in cursor
         ]
 
-    await ws.send_json({'type': 'chat_suggestions', 'data': data})
-
-async def db_listen(app):
-    try:
-        conn = await aiopg.connect(DB_CONN_STRING)
-        async with conn.cursor() as cursor:
-            await cursor.execute('LISTEN channel')
-            while True:
-                msg = await conn.notifies.get()
-                payload = json.loads(msg.payload)
-
-                if payload['type'] == 'new_message':
-                    chatid = payload['chatid']
-
-                    # TODO: log
-                    new_message_object = {
-                        'type': 'new_message', 
-                        'chatid': chatid, 
-                        'data': {
-                            'userid': payload['userid'],
-                            'write_time': payload['write_time'],
-                            'text': payload['text']
-                        }
-                    }
-
-                    for ws in app['chatid_to_websockets'][chatid]:
-                        asyncio.ensure_future(ws.send_json(new_message_object))
-
-                elif payload['type'] == 'user_connected':
-                    pass
-                elif payload['type'] == 'user_disconnected':
-                    pass
-                elif payload['type'] == 'user_joined_chat':
-                    pass
-                elif payload['type'] == 'user_left_chat':
-                    pass
-                else:
-                    pass # TODO: log
-
-    except asyncio.CancelledError:
-        conn.close()
+    await ws.send_json({'type': 'user_suggestions', 'data': data})
 
 async def start_background_tasks(app):
-    app['db_listener'] = app.loop.create_task(db_listen(app))
+    app['listener'] = app.loop.create_task(listener.listen(app))
 
 async def cleanup_background_tasks(app):
-    app['db_listener'].cancel()
-    await app['db_listener']
+    app['listener'].cancel()
+    await app['listener']
 
     # This will prompt the handle_client functions to exit gracefully
     await asyncio.gather(*[ws.close() for ws in app['all_websockets']])
@@ -336,18 +242,27 @@ async def fix_users(app):
             (argon2.hash('password1'), 'user1')
         )
 
+async def get_chatid_to_userids(app):
+    result = defaultdict(set)
+    with (await app['db_conn_pool'].cursor()) as cursor:
+        await cursor.execute('SELECT chatid, userid FROM inchat')
+        async for row in cursor:
+            result[row[0]].add(row[1])
+    return result
+
 def make_app():
     app = aiohttp_web.Application()
 
     # Because we use the DB asynchronously, we may need multiple
     # concurrent cursors, so create a connection pool.
     app['db_conn_pool'] = asyncio.get_event_loop().run_until_complete(
-        asyncio.ensure_future(
-            aiopg.create_pool(DB_CONN_STRING)
-        )
+        asyncio.ensure_future(aiopg.create_pool(common.DB_CONN_STRING))
+    )
+    app['chatid_to_userids'] = asyncio.get_event_loop().run_until_complete(
+        asyncio.ensure_future(get_chatid_to_userids(app))
     )
     app['all_websockets'] = []
-    app['chatid_to_websockets'] = defaultdict(set)
+    app['userid_to_websockets'] = defaultdict(set)
 
     # TODO: Remove this once registration is implemented;
     # this is only here because for some reason the password_hash field doesn't set

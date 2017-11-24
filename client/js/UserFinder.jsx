@@ -2,16 +2,16 @@ import React from "react";
 import Autosuggest from "react-autosuggest";
 
 function getSuggestionValue(suggestion) {
-	return suggestion.name;
+	return suggestion.username;
 }
 
 function renderSuggestion(suggestion) {
 	return (
-		<div>{suggestion.name}</div>
+		<div>{suggestion.username} ({suggestion.realname})</div>
 	);
 }
 
-class ChatFinder extends React.Component {
+class UserFinder extends React.Component {
 	constructor() {
 		super();
 		this.state = {value: ''};
@@ -42,19 +42,19 @@ class ChatFinder extends React.Component {
 
 		// Schedule the new request
 		this.lastRequestId = setTimeout(() => {
-			this.props.requestChatSuggestions(event.value);
+			this.props.requestUserSuggestions(event.value);
 		}, 500);
 	};
 
 	onSuggestionSelected(event, {suggestion}) {
 		this.setState({value: ''});
-		this.props.joinChat(suggestion.chatid);
+		this.props.startChat(suggestion.userid);
 	}
 
 	render() {
 		const { value } = this.state;
 		const inputProps = {
-			placeholder: "Enter chat name to find...",
+			placeholder: "Find a username...",
 			value,
 			onChange: this.onChange
 		};
@@ -75,4 +75,4 @@ class ChatFinder extends React.Component {
 	}
 }
 
-export { ChatFinder} ;
+export { UserFinder } ;

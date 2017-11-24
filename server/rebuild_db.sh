@@ -21,7 +21,7 @@ psql crapchat << EOF
         password_hash varchar NOT NULL,
         connected int4 NOT NULL
     );
-    CREATE TABLE chats (id serial PRIMARY KEY, name varchar NOT NULL);
+    CREATE TABLE chats (id serial PRIMARY KEY, name varchar);
     CREATE TABLE inchat (
     	id serial PRIMARY KEY,
     	chatid int4 REFERENCES chats (id), 
@@ -48,9 +48,9 @@ psql crapchat << EOF
         '',
         0
     );
-    INSERT INTO chats (id, name) VALUES (0, 'First chat');
-    INSERT INTO chats (id, name) VALUES (1, 'Second chat');
-    INSERT INTO chats (id, name) VALUES (123, 'A later chat');
+    INSERT INTO chats (name) VALUES ('First chat');
+    INSERT INTO chats (name) VALUES ('Second chat');
+    INSERT INTO chats (name) VALUES ('A later chat');
 
     COMMIT;
 EOF
