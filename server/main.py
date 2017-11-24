@@ -81,32 +81,35 @@ async def handle_client(request):
     userid = userid_from_token(request.rel_url.query.get('access_token'))
     await handle_connect(request.app, ws, userid)
 
-    async for msg in ws:
-        # TODO: log
-        if msg.type == aiohttp.WSMsgType.TEXT:
-            if msg.data == 'logout':
-                await ws.close()
-            else:
-                try:
-                    data = json.loads(msg.data)
-                except:
-                    continue # TODO: log
-
-                if data['type'] == 'new_message':
-                    asyncio.ensure_future(handle_new_message(request.app, data['chatid'], userid, data['message']))
-                elif data['type'] == 'join_chat':
-                    asyncio.ensure_future(handle_join_chat(request.app, ws, userid, data['chatid']))
-                elif data['type'] == 'leave_chat':
-                    asyncio.ensure_future(handle_leave_chat(request.app, ws, userid, data['chatid']))
-                elif data['type'] == 'get_chat_suggestions':
-                    asyncio.ensure_future(handle_get_chat_suggestions(request.app, ws, data['searchString']))
+    try:
+        async for msg in ws:
+            # TODO: log
+            if msg.type == aiohttp.WSMsgType.TEXT:
+                if msg.data == 'logout':
+                    await ws.close()
                 else:
-                    pass # TODO: log
+                    try:
+                        data = json.loads(msg.data)
+                    except:
+                        continue # TODO: log
 
-        elif msg.type == aiohttp.WSMsgType.ERROR:
-            pass # TODO: log
-            
-    await handle_disconnect(request.app, ws, userid)
+                    if data['type'] == 'new_message':
+                        asyncio.ensure_future(handle_new_message(request.app, data['chatid'], userid, data['message']))
+                    elif data['type'] == 'join_chat':
+                        asyncio.ensure_future(handle_join_chat(request.app, ws, userid, data['chatid']))
+                    elif data['type'] == 'leave_chat':
+                        asyncio.ensure_future(handle_leave_chat(request.app, ws, userid, data['chatid']))
+                    elif data['type'] == 'get_chat_suggestions':
+                        asyncio.ensure_future(handle_get_chat_suggestions(request.app, ws, data['searchString']))
+                    else:
+                        pass # TODO: log
+
+            elif msg.type == aiohttp.WSMsgType.ERROR:
+                pass # TODO: log
+    except Exception as e:
+        pass # TODO: log
+    finally:
+        await handle_disconnect(request.app, ws, userid)
 
     return ws
 
@@ -125,10 +128,13 @@ async def handle_connect(app, ws, userid):
 
         chat_data = await get_chat_data(cursor, chatids)
 
+        userids = tuple(set(sum((chat['users'] for chat in chat_data), [])))
+        user_data = await get_user_data(cursor, userids)
+
         for chatid in chatids:
             app['chatid_to_websockets'][chatid].add(ws)
 
-        await ws.send_json({'type': 'refresh', 'chat_data': chat_data})
+        await ws.send_json({'type': 'refresh', 'chat_data': chat_data, 'user_data': user_data})
         await notify(cursor, {'type': 'user_connected', 'userid': userid})
 
 async def handle_join_chat(app, ws, userid, chatid):
@@ -156,16 +162,23 @@ async def get_chat_data(cursor, chatids):
         name: The chat name
         messages: A list of dicts with keys ('user', 'write_time', 'text')
     '''
-
     if not chatids:
         return [] # The query directly below will fail on an empty tuple
 
     # Get chat names
     await cursor.execute('SELECT id, name FROM chats WHERE id IN %s', (chatids, ))
     chat_data = {
-        row[0]: {'name': row[1], 'messages': []} 
+        row[0]: {'name': row[1], 'users': [], 'messages': []} 
         async for row in cursor
     }
+
+    # Get users in each chat
+    await cursor.execute(
+        'SELECT chatid, userid FROM inchat WHERE chatid IN %s',
+        (tuple(chat_data.keys()), )
+    )
+    async for row in cursor:
+        chat_data[row[0]]['users'].append(row[1])
 
     # Get chat messages
     await cursor.execute(
@@ -180,6 +193,19 @@ async def get_chat_data(cursor, chatids):
     return [
         {'chatid': chatid, **value}
         for chatid, value in chat_data.items()
+    ]
+
+async def get_user_data(cursor, userids):
+    if not userids:
+        return [] # The query directly below will fail on an empty tuple
+
+    await cursor.execute(
+        'SELECT id, username, realname, connected FROM users WHERE id IN %s',
+        (userids, )
+    )
+    return [
+        {'userid': row[0], 'username': row[1], 'realname': row[2], 'connected': row[3]}
+        async for row in cursor
     ]
 
 async def handle_leave_chat(app, ws, userid, chatid):
@@ -289,6 +315,14 @@ async def start_background_tasks(app):
 async def cleanup_background_tasks(app):
     app['db_listener'].cancel()
     await app['db_listener']
+
+    # This will prompt the handle_client functions to exit gracefully
+    await asyncio.gather(*[ws.close() for ws in app['all_websockets']])
+
+    # At the end of handle_disconnect, each socket is removed from the list;
+    # we can only proceed once all sockets have been cleaned up (and removed).
+    while app['all_websockets']:
+        await asyncio.sleep(0)
 
 # TODO: Remove, see note in make_app
 async def fix_users(app):
