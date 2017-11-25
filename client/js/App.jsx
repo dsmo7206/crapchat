@@ -259,8 +259,6 @@ class App extends React.Component {
             return <div>Not connected</div>;
         }
 
-        const messagesArray = Array.from(this.state.chatMessagesMap.entries());
-
         const findChatInput = (
             <li key="findUser">
                 <UserFinder 
@@ -272,26 +270,26 @@ class App extends React.Component {
             </li>
         );
 
-        const summaryItems = messagesArray.map((item) => {
-            // item[1] is the message array
-            const hasActivity = (item[1].length > 0);
-            const lastMessage = hasActivity ? item[1][item[1].length-1] : null;
+        let summaryItems = [];
+        this.state.chatMessagesMap.forEach((messages, chatid) => {            
+            const hasActivity = (messages.length > 0);
+            const lastMessage = hasActivity ? messages[messages.length-1] : null;
 
-            return (
-                <li key={item[0]}>
+            summaryItems.push(
+                <li key={chatid}>
                     <ChatSummary 
-                        chatid={item[0]} 
-                        name={this.getChatName(item[0])}
+                        chatid={chatid} 
+                        name={this.getChatName(chatid)}
                         today={this.state.today}
                         hasActivity={hasActivity} 
                         lastMessage={lastMessage}
-                        isSelected={this.state.selectedChatid == item[0]}
+                        isSelected={this.state.selectedChatid == chatid}
                         onClicked={this.onSummaryClicked}
                         leaveChat={this.leaveChat}
                     />
                 </li>
             );
-        });
+        }, this);
 
         const selectedChatMessages = this.state.chatMessagesMap.get(this.state.selectedChatid);
 
