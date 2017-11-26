@@ -67,7 +67,7 @@ async def handle_notification(app, cursor, payload):
         ))
         # TODO: notify the existing users of the chat about the new users
 
-    elif message['type'] == 'user_left_chat':
+    elif payload['type'] == 'user_left_chat':
         app['chatid_to_userids'][payload['chatid']].remove(payload['userid'])
     
     else:
