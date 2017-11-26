@@ -222,6 +222,9 @@ async def cleanup_background_tasks(app):
     app['listener'].cancel()
     await app['listener']
 
+    app['db_conn_pool'].close()
+    await app['db_conn_pool'].wait_closed()
+
     # This will prompt the handle_client functions to exit gracefully
     await asyncio.gather(*[ws.close() for ws in app['all_websockets']])
 
