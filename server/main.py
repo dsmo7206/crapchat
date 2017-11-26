@@ -101,9 +101,9 @@ async def handle_client(request):
                     if data['type'] == 'new_message':
                         asyncio.ensure_future(handle_new_message(request.app, data['chatid'], userid, data['message']))
                     elif data['type'] == 'start_chat':
-                        asyncio.ensure_future(handle_start_chat(request.app, ws, data['userids']))
+                        asyncio.ensure_future(handle_start_chat(request.app, data['userids']))
                     elif data['type'] == 'leave_chat':
-                        asyncio.ensure_future(handle_leave_chat(request.app, ws, userid, data['chatid']))
+                        asyncio.ensure_future(handle_leave_chat(request.app, userid, data['chatid']))
                     elif data['type'] == 'get_user_suggestions':
                         asyncio.ensure_future(handle_get_user_suggestions(request.app, ws, userid, data['searchString']))
                     else:
@@ -143,7 +143,7 @@ async def handle_connect(app, ws, userid):
         await ws.send_json({'type': 'data_update', 'chat_data': chat_data, 'user_data': user_data})
         await notify(cursor, {'type': 'user_connected', 'userid': userid})
 
-async def handle_start_chat(app, ws, userids):
+async def handle_start_chat(app, userids):
     with (await app['db_conn_pool'].cursor()) as cursor:
         await cursor.execute('INSERT INTO chats (name) VALUES (null) RETURNING id')
         chatid = [row[0] async for row in cursor][0]
@@ -158,7 +158,7 @@ async def handle_start_chat(app, ws, userids):
             )
         await notify(cursor, {'type': 'users_joined_chat', 'userids': userids, 'chatid': chatid})
 
-async def handle_leave_chat(app, ws, userid, chatid):
+async def handle_leave_chat(app, userid, chatid):
     with (await app['db_conn_pool'].cursor()) as cursor:
         await cursor.execute(
             'DELETE FROM inchat WHERE userid=%s AND chatid=%s',

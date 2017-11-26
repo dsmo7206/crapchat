@@ -104,14 +104,12 @@ class App extends React.Component {
         let request = new XMLHttpRequest();
         request.open('POST', '/login', true); // "true" means async
 
-        const app = this; // Create reference for callback below
-
-        request.onreadystatechange = function() {
+        request.onreadystatechange = () => {
             if (request.readyState != 4)
             {
                 return; // Ignore until done
             }
-            app.onLoginResponse(request.status, request.statusText, JSON.parse(request.response));
+            this.onLoginResponse(request.status, request.statusText, JSON.parse(request.response));
         }
         request.setRequestHeader('Authorization', username + ':' + password);
         request.send();
