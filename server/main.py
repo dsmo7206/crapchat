@@ -222,9 +222,6 @@ async def cleanup_background_tasks(app):
     app['listener'].cancel()
     await app['listener']
 
-    app['db_conn_pool'].close()
-    await app['db_conn_pool'].wait_closed()
-
     # This will prompt the handle_client functions to exit gracefully
     await asyncio.gather(*[ws.close() for ws in app['all_websockets']])
 
@@ -232,6 +229,10 @@ async def cleanup_background_tasks(app):
     # we can only proceed once all sockets have been cleaned up (and removed).
     while app['all_websockets']:
         await asyncio.sleep(0)
+
+    # Close the database connection pool
+    app['db_conn_pool'].close()
+    await app['db_conn_pool'].wait_closed()
 
 # TODO: Remove, see note in make_app
 async def fix_users(app):
