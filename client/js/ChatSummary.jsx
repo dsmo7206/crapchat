@@ -16,24 +16,24 @@ class ChatSummary extends React.Component {
         );
 
         const summaryClassName = (
-            this.props.isSelected ? "chat-summary selected" : "chat-summary"
+            this.props.isSelected ? "summary selected" : "summary"
         );
 
         return (
             <div className={summaryClassName} onClick={() => {this.props.onClicked(this.props.chatid)}}>
-                <div className="chat-summary-top">
-                    <div className="chat-summary-top-title">
+                <div className="top">
+                    <div className="title">
                         {this.props.name}
                     </div>
-                    <div className="chat-summary-top-time">
+                    <div className="time">
                         {lastMessageTime}
                     </div>
                 </div>
-                <div className="chat-summary-bottom">
-                    <div className="chat-summary-bottom-message">
+                <div className="bottom">
+                    <div className="message">
                         {lastMessage}
                     </div>
-                    <button className="chat-summary-bottom-button" onClick={(event) => {
+                    <button className="button" onClick={(event) => {
                         this.props.leaveChat(this.props.chatid);
                         event.stopPropagation();
                     }}/>

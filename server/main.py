@@ -234,18 +234,6 @@ async def cleanup_background_tasks(app):
     app['db_conn_pool'].close()
     await app['db_conn_pool'].wait_closed()
 
-# TODO: Remove, see note in make_app
-async def fix_users(app):
-    with (await app['db_conn_pool'].cursor()) as cursor:
-        await cursor.execute(
-            'UPDATE users SET password_hash=%s WHERE username=%s',
-            (argon2.hash('password0'), 'user0')
-        )
-        await cursor.execute(
-            'UPDATE users SET password_hash=%s WHERE username=%s',
-            (argon2.hash('password1'), 'user1')
-        )
-
 async def get_chatid_to_userids(app):
     result = defaultdict(set)
     with (await app['db_conn_pool'].cursor()) as cursor:
@@ -267,12 +255,7 @@ def make_app():
     )
     app['all_websockets'] = []
     app['userid_to_websockets'] = defaultdict(set)
-
-    # TODO: Remove this once registration is implemented;
-    # this is only here because for some reason the password_hash field doesn't set
-    # properly in rebuild_db.sh, possibly because it needs escaping
-    asyncio.get_event_loop().run_until_complete(asyncio.ensure_future(fix_users(app)))
-
+    
     # All aiohttp_jinja2 decorators will look in the given folder
     # when searching for html files
     aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader('../client'))

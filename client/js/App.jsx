@@ -109,7 +109,12 @@ class App extends React.Component {
             {
                 return; // Ignore until done
             }
-            this.onLoginResponse(request.status, request.statusText, JSON.parse(request.response));
+            const responseObject = 
+                (request.status == 200) ? 
+                JSON.parse(request.response) : 
+                null
+            ;
+            this.onLoginResponse(request.status, request.statusText, responseObject);
         }
         request.setRequestHeader('Authorization', username + ':' + password);
         request.send();
@@ -308,11 +313,11 @@ class App extends React.Component {
             <div className="app">
                 <AlertContainer ref={obj => this.msg = obj} {...this.alertOptions} />
                 <AppHeader logout={this.logout}/>
-                <div className="app-main">
-                    <div className="panel-summaries">
+                <div className="main">
+                    <div className="summaries">
                         <ul>{[findChatInput].concat(summaryItems)}</ul>
                     </div>
-                    <div className="panel-chat">
+                    <div className="chat">
                         {chatItem}
                     </div>
                 </div>

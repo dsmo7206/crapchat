@@ -34,13 +34,13 @@ class Chat extends React.Component {
 
         return (
             <div className="chat">
-                <div className="chat-heading">
+                <div className="heading">
                     {this.props.name}: got {this.props.messages.length} messages!
                 </div>
-                <div className="chat-messages">
+                <div className="messages">
                     <ul>{listItems}</ul>
                 </div>
-                <input className="chat-input" placeholder="Enter your message..." onKeyDown={this.inputOnKeyDown}/>
+                <input className="input" placeholder="Enter your message..." onKeyDown={this.inputOnKeyDown}/>
             </div>
         );
     }
