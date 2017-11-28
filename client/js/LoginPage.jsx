@@ -45,14 +45,18 @@ class LoginPage extends React.Component {
         return (
             <div className="login">
                 <form onSubmit={this.onSubmit}>
-                    <label>
-                        Username:
-                        <input type="text" value={this.state.username} onChange={this.onUsernameChange}/>
-                    </label>
-                    <label>
-                        Password:
-                        <input type="password" value={this.state.password} onChange={this.onPasswordChange}/>
-                    </label>
+                    <div className="username">
+                        <label>
+                            Username:
+                            <input type="text" value={this.state.username} onChange={this.onUsernameChange}/>
+                        </label>
+                    </div>
+                    <div className="password">
+                        <label>
+                            Password:
+                            <input type="password" value={this.state.password} onChange={this.onPasswordChange}/>
+                        </label>
+                    </div>
                     <input type="submit" value="Login"/>
                 </form>
                 <div className="login=error">
